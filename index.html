@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vencimientos de C.D.E 2027</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Google Font: Inter -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <!-- PapaParse for CSV parsing -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+
+  <!-- Header / Navbar -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex justify-between items-center h-16">
+        <div class="flex items-center space-x-3">
+          <div class="bg-emerald-500 text-white p-2.5 rounded-xl shadow-md flex items-center justify-center">
+            <i class="fa-solid fa-table text-xl"></i>
+          </div>
+          <div>
+            <h1 class="font-bold text-lg text-slate-900 leading-tight">Vencimientos de C.D.E 2027</h1>
+            <p class="text-xs text-slate-500">Unidad de Organismos de Administración Escolar, Departamental de Educación de La Libertad</p>
+          </div>
+        </div>
+
+        <div class="flex items-center space-x-2">
+          <button id="btnHelp" class="inline-flex items-center gap-2 border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 px-3 py-2 rounded-lg text-sm font-medium transition-colors">
+            <i class="fa-regular fa-circle-question text-slate-500"></i>
+            <span class="hidden md:inline">Ayuda</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content Container -->
+  <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col gap-6">
+
+    <!-- Active Source Banner -->
+    <div id="sourceBanner" class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div class="flex items-center gap-3 overflow-hidden">
+        <div id="statusDot" class="w-3 h-3 rounded-full bg-slate-300 shrink-0"></div>
+        <div class="truncate">
+          <p class="text-xs text-slate-400 font-medium uppercase tracking-wider">Fuente Actual</p>
+          <h2 id="sheetTitleDisplay" class="font-semibold text-slate-800 text-base truncate">CDE VENCIDO 2027 v2</h2>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+        <button id="btnReload" title="Recargar Datos" class="p-2 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors disabled:opacity-40 disabled:cursor-not-allowed" disabled>
+          <i class="fa-solid fa-rotate-right"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Toolbar: Search -->
+    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-3 items-center justify-between">
+      <!-- Search -->
+      <div class="flex flex-col sm:flex-row items-center gap-2 w-full flex-grow max-w-2xl">
+        <div class="relative w-full">
+          <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+          <input type="text" id="searchInput" placeholder="Buscar por código..." class="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all">
+        </div>
+      </div>
+    </div>
+
+    <!-- Data Display Area -->
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex-grow flex flex-col min-h-[350px]">
+      
+      <!-- Empty State / Welcome Screen -->
+      <div id="emptyState" class="flex-grow flex flex-col items-center justify-center p-8 text-center">
+        <div class="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mb-4 text-2xl">
+          <i class="fa-solid fa-file-excel"></i>
+        </div>
+        <h3 class="text-lg font-semibold text-slate-800 mb-1">No hay datos para mostrar</h3>
+        <p class="text-sm text-slate-500 max-w-md">Los datos no se han podido cargar desde Google Sheets.</p>
+      </div>
+
+      <!-- Loading State -->
+      <div id="loadingState" class="hidden flex-grow flex flex-col items-center justify-center p-12">
+        <div class="inline-block w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+        <p class="text-slate-600 font-medium text-sm">Cargando y procesando datos...</p>
+      </div>
+
+      <!-- Error State -->
+      <div id="errorState" class="hidden flex-grow flex flex-col items-center justify-center p-8 text-center">
+        <div class="w-14 h-14 bg-red-50 text-red-500 rounded-full flex items-center justify-center mb-4 text-xl">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+        </div>
+        <h3 class="text-base font-semibold text-slate-800 mb-1">Error al cargar la fuente</h3>
+        <p id="errorMessage" class="text-sm text-slate-500 max-w-md mb-4">No pudimos acceder a los datos. Asegúrate de que el enlace sea público o publicado como CSV.</p>
+        <button id="btnErrorRetry" class="bg-slate-800 hover:bg-slate-900 text-white font-medium px-4 py-2 rounded-lg text-sm transition-colors">
+          <i class="fa-solid fa-rotate-right mr-1.5"></i> Intentar de Nuevo
+        </button>
+      </div>
+
+      <!-- Table View -->
+      <div id="tableViewContainer" class="hidden flex-grow overflow-x-auto">
+        <table class="w-full text-left border-collapse text-sm">
+          <thead id="tableHeader" class="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold sticky top-0 z-10 select-none">
+            <!-- Headers generated via JS -->
+          </thead>
+          <tbody id="tableBody" class="divide-y divide-slate-200 text-slate-700">
+            <!-- Rows generated via JS -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Record Counter Footer -->
+      <div id="recordCounterContainer" class="hidden border-t border-slate-200 bg-slate-50 px-4 py-3 sm:px-6 flex items-center justify-between text-xs sm:text-sm text-slate-600">
+        <span id="recordInfo">Mostrando 0 registros</span>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-white border-t border-slate-200 mt-auto py-4">
+    <div class="max-w-7xl mx-auto px-4 text-center text-xs text-slate-400">
+      <p>Google Sheet Visualizer • Unidad de Organismos de Administración Escolar</p>
+    </div>
+  </footer>
+
+  <!-- Modal: Help / Instructions -->
+  <div id="helpModal" class="hidden fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-slate-100 overflow-hidden">
+      <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+        <h3 class="font-bold text-slate-800 text-base flex items-center gap-2">
+          <i class="fa-regular fa-circle-question text-emerald-600"></i> Guía de Uso
+        </h3>
+        <button id="btnCloseHelpModal" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <div class="p-6 space-y-4 text-xs text-slate-600 leading-relaxed">
+        <h4 class="font-semibold text-slate-800 text-sm">Funcionalidades Destacadas</h4>
+        <ul class="space-y-2 list-disc pl-4">
+          <li><strong>Búsqueda por Código:</strong> Escribe en el buscador para filtrar registros de la hoja por código o nombre.</li>
+          <li><strong>Actualización Automática:</strong> Los datos se cargan directamente desde la hoja de cálculo de Google.</li>
+        </ul>
+      </div>
+
+      <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end items-center">
+        <button id="btnCloseHelpModalBottom" class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-900 text-white transition-colors">
+          Entendido
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2"></div>
+
+  <!-- Application Logic JS -->
+  <script>
+    // --- Application State ---
+    const state = {
+      rawData: [],          // Parsed Array of Objects
+      headers: [],          // Column header labels
+      filteredData: [],     // Data after search
+      // Default CSV URL provided by user
+      currentSourceUrl: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTkjGNvMLrvuJoigdniGsWfD-KWCiEk11ACGcSYv3o2AYGfMSc3lfyJPWSQ7_lRQBpa9LEMo4W8QiRp/pub?gid=0&single=true&output=csv',
+      // Default Source Title provided by user
+      sourceName: 'CDE VENCIDO 2027 v2'
+    };
+
+    // --- Custom Defined Column Headers ---
+    const CUSTOM_HEADERS = [
+      "No.",
+      "CÓDIGO",
+      "NOMBRE DEL CENTRO EDUCATIVO",
+      "FECHA DE VENCIMIENTO",
+      "ESTADO"
+    ];
+
+    // --- DOM Elements ---
+    const dom = {
+      btnHelp: document.getElementById('btnHelp'),
+      btnReload: document.getElementById('btnReload'),
+
+      helpModal: document.getElementById('helpModal'),
+      btnCloseHelpModal: document.getElementById('btnCloseHelpModal'),
+      btnCloseHelpModalBottom: document.getElementById('btnCloseHelpModalBottom'),
+
+      sourceBanner: document.getElementById('sourceBanner'),
+      sheetTitleDisplay: document.getElementById('sheetTitleDisplay'),
+      statusDot: document.getElementById('statusDot'),
+
+      emptyState: document.getElementById('emptyState'),
+      loadingState: document.getElementById('loadingState'),
+      errorState: document.getElementById('errorState'),
+      errorMessage: document.getElementById('errorMessage'),
+      btnErrorRetry: document.getElementById('btnErrorRetry'),
+
+      tableViewContainer: document.getElementById('tableViewContainer'),
+      recordCounterContainer: document.getElementById('recordCounterContainer'),
+
+      tableHeader: document.getElementById('tableHeader'),
+      tableBody: document.getElementById('tableBody'),
+
+      searchInput: document.getElementById('searchInput'),
+
+      recordInfo: document.getElementById('recordInfo'),
+      toastContainer: document.getElementById('toastContainer')
+    };
+
+    // --- Initialization & Event Listeners ---
+    function init() {
+      // Modal Open/Close
+      if (dom.btnHelp) dom.btnHelp.addEventListener('click', () => openModal(dom.helpModal));
+      if (dom.btnCloseHelpModal) dom.btnCloseHelpModal.addEventListener('click', () => closeModal(dom.helpModal));
+      if (dom.btnCloseHelpModalBottom) dom.btnCloseHelpModalBottom.addEventListener('click', () => closeModal(dom.helpModal));
+
+      // Actions
+      if (dom.btnReload) dom.btnReload.addEventListener('click', reloadData);
+      if (dom.btnErrorRetry) dom.btnErrorRetry.addEventListener('click', reloadData);
+
+      // Search Filter
+      if (dom.searchInput) dom.searchInput.addEventListener('input', handleFilterChange);
+
+      // Auto-load default dataset on initial page load
+      if (state.currentSourceUrl) {
+        fetchAndParseCSV(state.currentSourceUrl, state.sourceName);
+      }
+    }
+
+    // --- Modal Management ---
+    function openModal(modal) {
+      if (modal) modal.classList.remove('hidden');
+    }
+    function closeModal(modal) {
+      if (modal) modal.classList.add('hidden');
+    }
+
+    // --- Reload Data Action ---
+    function reloadData() {
+      if (state.currentSourceUrl) {
+        fetchAndParseCSV(state.currentSourceUrl, state.sourceName);
+      }
+    }
+
+    // --- Resilient Fetching & CSV Parsing ---
+    async function fetchAndParseCSV(url, sourceName) {
+      showState('loading');
+      state.currentSourceUrl = url;
+      state.sourceName = sourceName;
+
+      // Generar lista de URLs alternativas para sobrepasar bloqueos CORS / permisos de previsualización
+      const urlsToTry = [
+        url,
+        `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+        `https://corsproxy.io/?${encodeURIComponent(url)}`
+      ];
+
+      // Si la URL es de tipo /pub? intentamos también convertirla a /export?format=csv por si acaso
+      if (url.includes('docs.google.com/spreadsheets/d/e/')) {
+        const keyMatch = url.match(/\/d\/e\/([a-zA-Z0-9-_]+)/);
+        if (keyMatch && keyMatch[1]) {
+          const exportUrl = `https://docs.google.com/spreadsheets/d/e/${keyMatch[1]}/pub?output=csv`;
+          urlsToTry.splice(1, 0, `https://api.allorigins.win/raw?url=${encodeURIComponent(exportUrl)}`);
+        }
+      }
+
+      let csvContent = null;
+
+      for (const targetUrl of urlsToTry) {
+        try {
+          const response = await fetch(targetUrl, { method: 'GET', cache: 'no-cache' });
+          if (response.ok) {
+            const text = await response.text();
+            // Comprobar que no recibimos un HTML de error de inicio de sesión de Google
+            if (text && !text.includes('<!DOCTYPE html>') && !text.includes('<html')) {
+              csvContent = text;
+              break;
+            }
+          }
+        } catch (e) {
+          console.warn(`Intento fallido cargando ${targetUrl}:`, e);
+        }
+      }
+
+      if (csvContent) {
+        parseCSVContent(csvContent);
+        showToast('Datos cargados correctamente', 'success');
+      } else {
+        showError('No se pudo acceder a la hoja de cálculo. Asegúrate de verificar los permisos en Google Sheets.');
+      }
+    }
+
+    function parseCSVContent(data) {
+      if (typeof data === 'string') {
+        const parsed = Papa.parse(data, { header: false, skipEmptyLines: true });
+        data = parsed.data;
+      }
+
+      // Filter out empty rows
+      const validRows = data.filter(row => Array.isArray(row) ? row.some(val => val !== null && val !== '') : Object.values(row).some(val => val !== null && val !== ''));
+      
+      if (validRows.length === 0) {
+        showError('No se encontraron registros válidos en la hoja.');
+        return;
+      }
+
+      // Determine max columns needed
+      let maxCols = 0;
+      validRows.forEach(row => {
+        const len = Array.isArray(row) ? row.length : Object.keys(row).length;
+        if (len > maxCols) maxCols = len;
+      });
+
+      // Assign specified custom column names, defaulting to Columna N if extra columns exist
+      state.headers = Array.from({ length: maxCols }, (_, i) => CUSTOM_HEADERS[i] || `Columna ${i + 1}`);
+
+      // Normalize all rows into objects mapped to the headers
+      state.rawData = validRows.map(row => {
+        const rowObj = {};
+        state.headers.forEach((hKey, idx) => {
+          rowObj[hKey] = Array.isArray(row) ? (row[idx] ?? '') : (Object.values(row)[idx] ?? '');
+        });
+        return rowObj;
+      });
+
+      state.filteredData = [...state.rawData];
+
+      // UI Banner Updates
+      dom.sheetTitleDisplay.textContent = state.sourceName;
+      dom.statusDot.className = 'w-3 h-3 rounded-full bg-emerald-500 shrink-0';
+      dom.btnReload.disabled = false;
+
+      // Render View
+      showState('data');
+      render();
+    }
+
+    // --- UI State Toggling ---
+    function showState(mode) {
+      dom.emptyState.classList.add('hidden');
+      dom.loadingState.classList.add('hidden');
+      dom.errorState.classList.add('hidden');
+      dom.tableViewContainer.classList.add('hidden');
+      if (dom.recordCounterContainer) dom.recordCounterContainer.classList.add('hidden');
+
+      if (mode === 'empty') {
+        dom.emptyState.classList.remove('hidden');
+      } else if (mode === 'loading') {
+        dom.loadingState.classList.remove('hidden');
+      } else if (mode === 'error') {
+        dom.errorState.classList.remove('hidden');
+      } else if (mode === 'data') {
+        if (dom.recordCounterContainer) dom.recordCounterContainer.classList.remove('hidden');
+        dom.tableViewContainer.classList.remove('hidden');
+      }
+    }
+
+    function showError(msg) {
+      dom.errorMessage.textContent = msg;
+      dom.statusDot.className = 'w-3 h-3 rounded-full bg-red-500 shrink-0';
+      showState('error');
+    }
+
+    // --- Filters ---
+    function handleFilterChange() {
+      const query = dom.searchInput.value.toLowerCase().trim();
+
+      state.filteredData = state.rawData.filter(row => {
+        if (!query) return true;
+        return Object.values(row).some(val => 
+          String(val || '').toLowerCase().includes(query)
+        );
+      });
+
+      render();
+    }
+
+    // --- Rendering ---
+    function render() {
+      renderTable();
+      renderRecordCount();
+    }
+
+    function renderTable() {
+      // Header Rendering
+      dom.tableHeader.innerHTML = '';
+      const trHead = document.createElement('tr');
+
+      state.headers.forEach(header => {
+        const th = document.createElement('th');
+        th.className = 'px-4 py-3 whitespace-nowrap text-slate-600 font-semibold select-none';
+        th.innerHTML = `
+          <div class="flex items-center gap-2">
+            <span>${escapeHTML(header)}</span>
+          </div>
+        `;
+        trHead.appendChild(th);
+      });
+      dom.tableHeader.appendChild(trHead);
+
+      // Body Rendering
+      dom.tableBody.innerHTML = '';
+
+      if (state.filteredData.length === 0) {
+        dom.tableBody.innerHTML = `
+          <tr>
+            <td colspan="${state.headers.length}" class="text-center py-8 text-slate-400">
+              No se encontraron registros coincidentes
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      state.filteredData.forEach((row, idx) => {
+        const tr = document.createElement('tr');
+        tr.className = idx % 2 === 0 ? 'bg-white hover:bg-slate-50' : 'bg-slate-50/50 hover:bg-slate-100/50';
+
+        state.headers.forEach(header => {
+          const td = document.createElement('td');
+          const cellValue = row[header] ?? '';
+
+          // Special 2-line clamp styling for "NOMBRE DEL CENTRO EDUCATIVO"
+          if (header === "NOMBRE DEL CENTRO EDUCATIVO") {
+            td.className = 'px-4 py-3 max-w-sm text-slate-700 font-medium leading-snug';
+            td.innerHTML = `<span class="line-clamp-2" title="${escapeHTML(cellValue)}">${escapeHTML(cellValue)}</span>`;
+          } else {
+            td.className = 'px-4 py-3 whitespace-nowrap max-w-xs truncate text-slate-600';
+            td.textContent = cellValue;
+          }
+
+          tr.appendChild(td);
+        });
+
+        dom.tableBody.appendChild(tr);
+      });
+    }
+
+    function renderRecordCount() {
+      if (dom.recordInfo) {
+        const total = state.filteredData.length;
+        dom.recordInfo.textContent = `Mostrando todos los registros (${total} ${total === 1 ? 'registro' : 'registros'})`;
+      }
+    }
+
+    // --- Helpers ---
+    function escapeHTML(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function showToast(message, type = 'info') {
+      const container = dom.toastContainer || document.getElementById('toastContainer');
+      if (!container) return;
+
+      const toast = document.createElement('div');
+      const bg = type === 'success' ? 'bg-emerald-600 text-white' : (type === 'error' ? 'bg-red-600 text-white' : 'bg-slate-800 text-white');
+      const icon = type === 'success' ? 'fa-circle-check' : (type === 'error' ? 'fa-circle-xmark' : 'fa-circle-info');
+
+      toast.className = `${bg} px-4 py-2.5 rounded-xl shadow-lg text-xs font-medium flex items-center gap-2 transform transition-all duration-300 translate-y-2 opacity-0`;
+      toast.innerHTML = `<i class="fa-solid ${icon}"></i> <span>${message}</span>`;
+
+      container.appendChild(toast);
+
+      setTimeout(() => {
+        toast.classList.remove('translate-y-2', 'opacity-0');
+      }, 10);
+
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-2');
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+
+    // --- Run App ---
+    window.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>
